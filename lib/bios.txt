@@ -1,0 +1,77 @@
+/* Bios calls */
+
+{macro print_string$ (pString bRow bCol bAttr wLen cbMode)
+	{
+		(asm_db 0x55) /* push bp */
+		(asm_push bCol) /* push bCol */
+		(asm_push bRow) /* push bRow */
+		(asm_push pString) /* push pString */
+		(asm_push wLen) /* push wLen */
+		(asm_push bAttr) /* push bAttr */
+		
+		(asm_db 0x8c 0xd8) /* mov ax, ds */
+		(asm_db 0x8e 0xc0) /* mov es, ax */
+		(asm_db 0x5b) /* pop bx (bAttr) */
+		(asm_db 0xb7 0x00) /* mov bh, 0 */
+		(asm_db 0x59) /* pop cx (wLen) */
+		(asm_db 0x5d) /* pop bp (pString) */
+		(asm_db 0x58) /* pop ax (bRow) */
+		(asm_db 0x5a) /* pop dx (bCol) */
+		(asm_db 0x88 0xc6) /* mov dh, al */
+		(asm_db 0xb0) (asm_db cbMode) /* mov al, cbMode */
+		(asm_db 0xb4 0x13) /* mov ah, 13 */
+		(asm_db 0xcd 0x10) /* int 10 */
+		(asm_db 0x5d) /* pop bp */
+	}
+}
+
+{macro clear_screen$ (cbAttr)
+	{
+		(asm_db 0xb7) (asm_db cbAttr) /* mov bh, cbAttr */
+		(asm_db 0xb8 0x00 0x06) /* mov ax, 0600h */
+		(asm_db 0xb9 0x00 0x00) /* mov cx, 0h */
+		(asm_db 0xba 0x4f 0x18) /* mov dx, 184f */
+		(asm_db 0xcd 0x10) /* int 10 */
+	}
+}
+
+{macro put_char_tt$ (bC)
+	/* put char in teletype mode (ah = 0e) */
+	{
+		(asm_push bC) /* push C */
+		(asm_db 0x58) /* pop ax */
+		(asm_db 0xb4 0x0e) /* mov ah,0e */
+		(asm_db 0xb3 0x01) /* mov bl, 1 */
+		(asm_db 0xb7 0x00) /* mov bh, 0 */
+		(asm_db 0xb9)(asm_dw 1) /* mov cx, 1*/
+		(asm_db 0xcd 0x10) /* int 10 */
+	}
+}
+
+{macro put_char$ (bChar bAttr cwRepeat)
+	/* set char (ah = 09) */
+	{
+		(asm_push bAttr) /* push bAttr */
+		(asm_push bChar) /* push bChar */
+		(asm_db 0x58) /* pop ax */
+		(asm_db 0xb4 0x09) /* mov ah,09 */
+		(asm_db 0x5b) /* pop bx */
+		(asm_db 0xb7 0x00) /* mov bh, 0 */
+		(asm_db 0xb9)(asm_dw cwRepeat) /* mov cx, cwRepeat */
+		(asm_db 0xcd 0x10) /* int 10 */
+	}
+}
+
+{macro set_cursor$ (bCol bRow)
+	/* set cursor position (ah = 02) */
+	{
+		(asm_push bRow) /* push bRow */
+		(asm_push bCol) /* push bCol */
+		(asm_db 0x5a)	/* pop dx */
+		(asm_db 0x59)	/* pop cx */
+		(asm_db 0x88 0xce) /* mov dh, cl */
+		(asm_db 0xb7 0x00) /* mov bh, 0 */
+		(asm_db 0xb4 0x02) /* mov ah, 02 */
+		(asm_db 0xcd 0x10) /* int 10 */
+	}
+}

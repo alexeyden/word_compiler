@@ -1,0 +1,134 @@
+/* Utils macro library */
+
+(import "bios")
+
+/* Arrays */
+
+{macro aref$ (array index)
+	(+ (ref array) index)
+}
+
+{macro agetb$ (array index)
+	(getb (+ (ref array) index))
+}
+
+{macro agetw$ (array index)
+	{
+		(asm_db 0x55) /* push bp */
+		(asm_push (ref array))
+		(asm_push index)
+		(asm_db 0x5f) /* pop di */
+		(asm_db 0x5d) /* pop bp */
+		(asm_db 0x8b 0x03) /* mov ax, [bp+di] */
+		(asm_db 0x5d) /* pop bp */
+		(asm_db 0x50) /* push ax */
+	}
+}
+
+{macro asetw$ (array index value)
+	(setw (+ (ref array) index) value)
+}
+
+{macro asetb$ (array index value)
+	{
+		(asm_db 0x55) /* push bp */
+		(asm_push (ref array))
+		(asm_push index)
+		(asm_push value)
+		(asm_db 0x58) /* pop ax */
+		(asm_db 0x5f) /* pop di */
+		(asm_db 0x5d) /* pop bp */
+		(asm_db 0x88 0x03) /* mov [bp+di], al */
+		(asm_db 0x5d) /* pop bp */
+	}
+}
+
+
+/* Math & misc */
+
+{macro abs$ (wVal}
+	{
+		(asm_push wVal) /* push wVal */
+		(asm_db 0x58) /* pop ax */
+		(asm_db 0x3d) (asm_dw 0) /* cmp ax, 0 */
+		(asm_db 0x7d 0x02) /* jge +2 */
+		(asm_db 0xf7 0xd8) /* neg ax */
+		(asm_db 0x50) /* push ax */
+	}
+}
+
+{macro incb$ (pbVar)
+	{
+		(asm_db 0x55) /* push bp */
+		(asm_push pbVar) /* push bpVar */
+		(asm_db 0x5d) /* pop bp */
+		(asm_db 0x8a 0x46 0x00) /* mov al, [bp + 0] */
+		(asm_db 0xfe 0xc0) /* inc al */
+		(asm_db 0x88 0x46 0x00) /* mov [bp+0], al */
+		(asm_db 0x5d) /* pop bp */
+	}
+}
+
+{macro decb$ (pbVar)
+	{
+		(asm_db 0x55) /* push bp */
+		(asm_push pbVar) /* push bpVar */
+		(asm_db 0x5d) /* pop bp */
+		(asm_db 0x8a 0x46 0x00) /* mov al, [bp + 0] */
+		(asm_db 0xfe 0xc8) /* inc al */
+		(asm_db 0x88 0x46 0x00) /* mov [bp+0], al */
+		(asm_db 0x5d) /* pop bp */
+	}
+}
+
+{macro incw$ (pwVar)
+	{
+		(asm_db 0x55) /* push bp */
+		(asm_push pwVar) /* push bwVar */
+		(asm_db 0x5d) /* pop bp */
+		(asm_db 0x8b 0x46 0x00) /* mov ax, [bp + 0] */
+		(asm_db 0x40) /* inc ax */
+		(asm_db 0x89 0x46 0x00) /* mov [bp+0], ax */
+		(asm_db 0x5d) /* pop bp */
+	}
+}
+
+{macro cint$ (bVar)
+	/* extend signed byte to signed word */
+	{
+		(asm_push bVar) /* push bVar */
+		(asm_db 0x58) /* pop ax */
+		(asm_db 0x86 0xc4) /* xchg al,ah */
+		(asm_db 0xb1 0x08) /* mov cl, 08h */
+		(asm_db 0xd3 0xf8) /* sar ax, cl */
+		(asm_db 0x50) /* push ax */
+	}
+}
+
+/* Assembler */
+
+{macro asm_int$ (N)
+	{
+		(asm_db 0xcd) (asm_db N)	/* int N */
+	}
+}
+
+/* Print */
+
+{proc print_num (wN)
+	{if ((< wN 0)(put_char_tt$ '-'))
+		(else (put_char_tt$ '+'))}
+	
+	(setw wN (abs$ wN))
+	
+	(put_char_tt$ (+ '0' (% (/ wN 10000) 10)))
+	(put_char_tt$ (+ '0' (% (/ wN 1000) 10)))
+	(put_char_tt$ (+ '0' (% (/ wN 100) 10)))
+	(put_char_tt$ (+ '0' (% (/ wN 10) 10)))
+	(put_char_tt$ (+ '0' (% wN 10)))
+}
+
+{proc print_ln ()
+	(put_char_tt$ '\r')
+	(put_char_tt$ '\n')
+}

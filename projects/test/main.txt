@@ -1,0 +1,69 @@
+(import "bios")
+(import "util")
+(import "dos")
+
+[db hello "hello, $"]
+[db day 0]
+[db month 0]
+[dw year 0]
+
+{proc test1 (a b c)
+	(dw loc1 0xde)
+	(dw loc2 0xad)
+	(setw loc1 (+ a b c))
+	(setw loc2 (* a b c))
+	(return (+ loc1 loc2))
+}
+
+{proc test2 ()
+	(db loc 1 2)
+	
+	(setb loc (* loc 10))
+	(setb (aref loc 1) (* (agetb loc 1) 10))
+	
+	(return (+ (agetb loc 0) (agetb loc 1)))
+}
+
+{proc main ()
+	/* test get */
+	/*
+	{setw (+ (ref ga) 13) (* (getw (+ (ref ga) 13)) 2 )}
+	*/
+	
+	/* test if */
+	/*
+	(if ((> g1 10) (setw g1 100))
+		((> g1 20) (setw g1 200))
+		(else (setw g1 50)))
+	*/
+	
+	/* test call */
+	/* {setw g1 (test1 1 2 3)} /* g1 = 12 */
+	/* {setw g1 (test2)} */
+	
+	/* test for */
+	[dw i 0]
+	(for (setw i 0) (< i 10) (incw$ i)
+		(put_str$ hello))
+	
+	
+	/* (get_date! (ref day) (ref month) (ref year)) */
+	
+	/* test operations */
+	
+	(print_num (* 2 124)) (put_char_tt$ '\r') (put_char_tt$ '\n') /* 248 */
+	(print_num (imul -65 24)) (put_char_tt$ '\r') (put_char_tt$ '\n') /* -1560 */
+	(print_num (/ 311 30)) (put_char_tt$ '\r') (put_char_tt$ '\n') /* 10 */
+	(print_num (idiv -210 11)) (put_char_tt$ '\r') (put_char_tt$ '\n') /* -19 */
+	
+	(print_num (| 0x48 0x31)) (put_char_tt$ '\r') (put_char_tt$ '\n') /* 121 */
+	(print_num (& 55 93)) (put_char_tt$ '\r') (put_char_tt$ '\n') /* 21 */
+	(print_num (<< 1 2)) (put_char_tt$ '\r') (put_char_tt$ '\n') /* 4 */
+	(print_num (>> 16 3)) (put_char_tt$ '\r') (put_char_tt$ '\n') /* 2 */
+	
+	(print_num (< 1 2)) (put_char_tt$ '\r') (put_char_tt$ '\n') /* 1 */
+	(print_num (> 16 3)) (put_char_tt$ '\r') (put_char_tt$ '\n') /* 1 */
+	(print_num (= 45 45)) (put_char_tt$ '\r') (put_char_tt$ '\n') /* 1 */
+	
+	(wait_key$)
+}

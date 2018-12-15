@@ -1,0 +1,46 @@
+/* Dos utils */
+
+{macro psp_argc_ptr$ () 0x80}
+{macro psp_argv_ptr$ () 0x82}
+
+/* Dos Calls */
+
+{macro get_date$ (pbDay pbMonth pwYear pbDayOfWeek)
+	{
+		(asm_db 0x55) /* push bp */
+		
+		(asm_push pbDay) /* push pbDay */
+		(asm_push pbMonth) /* push pbMonth */
+		(asm_push pwYear) /* push pbYear */
+		(asm_push pbDayOfWeek) /* push pbDayOfWeek */
+		
+		(asm_db 0xb4 0x2a) /* mov ah,2a */
+		(asm_db 0xcd 0x21) /* int 21 */
+		
+		(asm_db 0x5d) /* pop bp */
+		(asm_db 0x88 0x46 0x00) /* mov [bp],al */
+		(asm_db 0x5d) /* pop bp */
+		(asm_db 0x89 0x4e 0x00) /* mov [bp],cx */
+		(asm_db 0x5d) /* pop bp */
+		(asm_db 0x88 0x76 0x00) /* mov [bp],dh */
+		(asm_db 0x5d) /* pop bp */
+		(asm_db 0x88 0x56 0x00) /* mov [bp],dl */
+		
+		(asm_db 0x5d) /* pop bp */
+	}
+}
+
+{macro put_str$ (pString}
+	{
+		(asm_db 0xba) (asm_offset pString) /* mov dx, <pString> */ 
+		(asm_db 0xb4 0x09)	/* mov ah, 09 */
+		(asm_db 0xcd 0x21) /* int 21 */
+	}
+}
+
+{macro wait_key$ ()
+	{
+		(asm_db 0xb4 0x00)	/* mov ah, 00 */
+		(asm_db 0xcd 0x16) /* int 21 */
+	}
+}

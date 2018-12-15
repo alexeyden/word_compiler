@@ -1,0 +1,330 @@
+(import "bios")
+(import "util")
+(import "dos")
+
+/* 
+	XXX   X XXX XXX X X XXX XXX XXX XXX XXX
+	X X  XX   X   X X X X   X     X X X X X
+	X X   X XXX XXX XXX XXX XXX  X  XXX XXX
+	X X   X X     X   X   X X X  X  X X   X
+	XXX   X XXX XXX   X XXX XXX  X  XXX XXX
+*/
+
+(dw gwSymbols
+	0b111101101101111 /* 0 */
+	0b001011001001001 /* 1 */
+	0b111001111100111 /* 2 */
+	0b111001111001111 /* 3 */
+	0b101101111001001 /* 4 */
+	0b111100111001111 /* 5 */
+	0b111100111101111 /* 6 */
+	0b111001010010010 /* 7 */
+	0b111101111101111 /* 8 */
+	0b111101111001111 /* 9 */
+)
+
+(db gbMsgDateNow "Сегодня")
+(db gbMsgDateDmb "ДМБ")
+(db gbMsgDaysLeft "ОСТАЛОСЬ ДНЕЙ")
+(db gbMsgDaysWeeks "Недели: XX Дни: XX ПХД: XX")
+
+(db gbMonthNames
+	" Января "
+	" Февраля"
+	" Марта  "
+	" Апреля "
+	"  Мая   "
+	"  Июня  "
+	"  Июля  "
+	" Августа"
+	"Сентября"
+	" Октября"
+	" Ноября "
+	" Декабря")
+
+(db gbMonths 31 28 31 30 31 30 31 31 30 31 30 31)
+
+(db gbDay 0)
+(db gbMonth 0)
+(dw gwYear 0)
+(db gbMode 0)
+
+(db gbCurDay 0)
+(db gbCurMonth 0)
+(dw gwCurYear 0)
+(db gbCurDayOfWeek 0)
+
+(db gNumbersColor 0xff)
+
+(let MODE_ADD_NONE 'a')
+(let MODE_ADD_CUR  'b')
+(let MODE_ADD_LAST 'c')
+(let MODE_ADD_BOTH 'd')
+
+(db gbMsgWrongArgs "ДМБ ТАЙМЕР (c) DAV 01.12.18\r\n\r\n"
+				   "Параметр не задан или задан неверно.\r\n"
+				   "Параметр должен иметь вид ДД.ММ.ГГГГР (например: 10.12.2018a)\r\n"
+				   "ДД - день, ММ - месяц, ГГГГ - год, Р - режим (a,b,c,d)\r\n"
+				   "Режимы:\r\n"
+				   "a - не считать сегодняшний и последний день\r\n"
+				   "b - считать только сегодняшний день\r\n"
+				   "c - считать только последний день\r\n"
+				   "d - считать сегодняшний и последний день$")
+				   
+/* Macro wrappers to reduce file size */
+
+{proc print_string (pString bRow bCol bAttr wLen)
+	(print_string$ pString bRow bCol bAttr wLen 0)
+}
+				   
+				   
+/* Calculations */
+
+{proc calc_days ()
+	(dw days 0)
+	(db i 0)
+	
+	(setb i gbCurMonth)
+	
+	(if ((< gwYear gwCurYear)
+			(return 0))
+		((& (= gwYear gwCurYear) (< gbMonth gbCurMonth))
+			(return 0)))
+	
+	(if ((< gwCurYear gwYear)
+		(for [] (<= i 11) (incb$ (ref i))
+			(setw days (+ days (agetb$ gbMonths i))))
+		(setb i 0)))
+	
+	(for [] (< i gbMonth) (incb$ (ref i))
+		(setw days (+ days (agetb$ gbMonths i))))
+	
+	(setw days (+ days gbDay (- gbCurDay) -1))
+	
+	(if ((= gbMode MODE_ADD_BOTH)
+			(setw days (+ days 2)))
+		((| (= gbMode MODE_ADD_CUR) (= gbMode MODE_ADD_LAST))
+			(setw days (+ days 1))))
+	
+	(if ((< days 0)
+		(setw days 0)))
+		
+	(if ((> days 365)
+		(setw days 365)))
+	
+	(return days)
+}
+
+{proc calc_percent (wDays)
+	(dw percent 0)
+	
+	(let daysMod (% (* wDays 100) 365))
+	
+	(setw percent (<< (/ (* wDays 100) 365) 8))
+	(setw percent (| percent (/ (* 100 daysMod) 365)))
+	
+	(return percent)
+}
+
+{proc calc_sundays (wDays bDayOfWeek)
+	(db sundays 0)
+	(db leftDays 0)
+	
+	(setb leftDays (% wDays 7))
+	(setb sundays (/ wDays 7))
+	
+	(if ([& (< bDayOfWeek 6) (>= (+ bDayOfWeek leftDays) 6)]
+		(incb$ (ref sundays))))
+	
+	(return sundays)
+}
+
+{proc read_date ()
+	(get_date$ (ref gbCurDay) (ref gbCurMonth) (ref gwCurYear) (ref gbCurDayOfWeek))
+	
+	(setb gbMonth (- gbMonth 1))
+	(setb gbCurMonth (- gbCurMonth 1))
+	
+	(if ((= gbCurDayOfWeek 0)
+			(setb gbCurDayOfWeek 7)))
+}
+
+/* Drawing */
+
+{proc draw_block (col row)
+	(set_cursor$ col row)
+	(put_char$ ' ' gNumbersColor 3)
+	
+	(set_cursor$ col (+ row 1))
+	(put_char$ ' ' gNumbersColor 3)
+}
+
+{proc draw_symbol_row (bmp_row col row)
+	(if ((& bmp_row 0b100)
+		(draw_block col row)))
+	(if ((& bmp_row 0b010)
+		(draw_block (+ col 3) row)))
+	(if ((& bmp_row 0b001)
+		(draw_block (+ col 6) row)))
+}
+
+{proc draw_symbol (bmp col row)
+	(draw_symbol_row (>> bmp 12) col row)
+	(draw_symbol_row (>> bmp 9) col (+ row 2))
+	(draw_symbol_row (>> bmp 6) col (+ row 4))
+	(draw_symbol_row (>> bmp 3) col (+ row 6))
+	(draw_symbol_row bmp col (+ row 8))
+}
+
+{proc draw_num10 (num col row attr)
+	(set_cursor$ col row)
+	(put_char$ (+ (/ num 10) '0') attr 1)
+	(set_cursor$ (+ col 1) row)
+	(put_char$ (+ (% num 10) '0') attr 1)
+}
+
+{proc draw_dates ()
+	(let nowTitleRow 0)
+	(let nowDateRow 1)
+	(let thenTitleRow 3)
+	(let thenDateRow 4)
+	
+	(let monthStringLen 8)
+	
+	/* Now */
+	(print_string (ref gbMsgDateNow) nowTitleRow 37 0b1010 (sizeof gbMsgDateNow))
+	(draw_num10 gbCurDay 33 nowDateRow 0b1111)
+	(print_string (+ (ref gbMonthNames) (* gbCurMonth 8)) nowDateRow 36 0b0111 monthStringLen)
+	(draw_num10 ((/ gwCurYear 100) 45 nowDateRow 0b1111))
+	(draw_num10 ((% gwCurYear 100) 47 nowDateRow 0b1111))
+	
+	/* Then */
+	(print_string (ref gbMsgDateDmb) thenTitleRow 37 0b1110 (sizeof gbMsgDateDmb))
+	(draw_num10 gbDay 33 thenDateRow 0b1111)
+	(print_string (+ (ref gbMonthNames) (* gbMonth 8)) thenDateRow 36 0b0111 monthStringLen)
+	(draw_num10 ((/ gwYear 100) 45 thenDateRow 0b1111))
+	(draw_num10 ((% gwYear 100) 47 thenDateRow 0b1111))
+}
+
+{proc draw_days_left (wDays bSundays)
+	(print_string (ref gbMsgDaysLeft) 6 35 7 (sizeof gbMsgDaysLeft))
+	
+	(draw_symbol (agetw$ gwSymbols (* 2 (/ wDays 100))) 25 8)
+	(draw_symbol (agetw$ gwSymbols (* 2 (% (/ wDays 10) 10))) 35 8)
+	(draw_symbol (agetw$ gwSymbols (* 2 (% wDays 10))) 45 8)
+	
+	(print_string (ref gbMsgDaysWeeks) 19 27 7 (sizeof gbMsgDaysWeeks))
+	(draw_num10 (/ wDays 7) 35 19 8)
+	(draw_num10 (% wDays 7) 43 19 8)
+	(draw_num10 bSundays 51 19 8)
+}
+
+{proc draw_progress (bP1 bP2)
+	(db length 0)
+	(db i 0)
+	(db color 0)
+	(db text " 00.00%")
+	
+	(let BG_RED 0b01001111)
+	(let BG_GREEN 0b00101111)
+	
+	(let barLength 76)
+	
+	(setb length (/ (* barLength bP1) 100))
+	
+	(for [setb i 0] (< i barLength) (incb$ (ref i))
+		(if ([< i length]
+			(setb color BG_GREEN))
+		(else
+			(setb color BG_RED)))
+			
+		(set_cursor$ (+ i 2) 21)
+		(put_char$ ' ' color 1)
+		(set_cursor$ (+ i 2) 22)
+		(put_char$ ' ' color 1)
+		(set_cursor$ (+ i 2) 23)
+		(put_char$ ' ' color 1)
+	)
+	
+	(if ((< bP1 50)
+		(setb color BG_RED))
+	(else
+		(setb color BG_GREEN)))
+	
+	(if ((= bP1 100)
+		(asetb$ text 0 '1')))
+	
+	(asetb$ text 1 (+ '0' (/ (% bP1 100) 10)))
+	(asetb$ text 2 (+ '0' (% bP1 10)))
+	
+	(asetb$ text 4 (+ '0' (/ bP2 10)))
+	(asetb$ text 5 (+ '0' (% bP2 10)))
+	
+	(print_string (ref text) 22 37 color (sizeof text))
+}
+
+/* Arguments parsing
+   Arguments format: dd.mm.yyyyp
+*/
+
+{proc parse_num (pbNum)
+	(let d10 [- (getb pbNum) '0'])
+	(let d01 [- (getb (+ pbNum 1)) '0'])
+	
+	(return [+ (* d10 10) d01])
+}
+
+{proc parse_args (pbDay pbMonth pwYear pbMode)
+	(let argp (psp_argv_ptr$))
+	
+	(db argc 0)
+	
+	(setb argc (getb (psp_argc_ptr$)))
+	
+	(if {(!= argc 12)
+		(return false)})
+		
+	(setb (uref pbDay) (parse_num argp))
+	(setb (uref pbMonth) (parse_num (+ argp 3)))
+	(setw (uref pwYear) (+ (* (parse_num (+ argp 6)) 100) (parse_num (+ argp 8))))
+	(setb (uref pbMode) (getb (+ argp 10)))
+	
+	(if ([| (= (getb pbDay) 0) (> (getb pbDay) 31)
+			(= (getb pbMonth) 0)(> (getb pbMonth) 12)
+			(< (getb pbMode) 'a') (> (getb pbMode) 'd')]
+		(return false)))
+	
+	(return true)
+}
+
+{proc main ()
+	(dw wDays 0)
+	(dw wPercent 0)
+	(db bSundays 0)
+	(db bDayOfWeek 0)
+	
+	(if [(= false (parse_args (ref gbDay) (ref gbMonth) (ref gwYear) (ref gbMode)))
+		(put_str$ gbMsgWrongArgs)
+		(return)])
+	
+	(read_date)
+	
+	(setb bDayOfWeek gbCurDayOfWeek)
+	
+	(if ((| (= gbMode MODE_ADD_BOTH) (= gbMode MODE_ADD_CUR))
+			(setb bDayOfWeek (- bDayOfWeek 1))))
+	
+	(setw wDays (calc_days))
+	(setw wPercent (calc_percent (- 365 wDays)))
+	(setb bSundays (calc_sundays wDays bDayOfWeek))
+	
+	(clear_screen$ 7)
+	
+	(draw_dates)
+	(draw_days_left wDays bSundays)
+	
+	(draw_progress (& (>> wPercent 8) 0xff) (& wPercent 0xff))
+	
+	(wait_key$)	
+	(clear_screen$ 7)
+}
